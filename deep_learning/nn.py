@@ -1,6 +1,6 @@
 import numpy as np
 
-from activation_functions import relu, drelu
+from deep_learning.activation_functions import relu, drelu
 
 
 class Neuron(object):
@@ -29,11 +29,11 @@ class Layer(object):
 
     @property
     def W(self):
-        return np.vstack((nj.w for nj in self.neurons))
+        return np.vstack([nj.w for nj in self.neurons])
 
     @property
     def B(self):
-        return np.vstack((nj.b for nj in self.neurons))
+        return np.vstack([nj.b for nj in self.neurons])
 
     def out(self, z: np.ndarray):
         # Compute layer output given input z
@@ -61,19 +61,25 @@ class FFNN(object):
 
         # Sizes
         self.n_features = x_train.shape[1]
-        self.n_outputs = y_train.shape[1]
+        self.n_outputs = 1 if len(y_train.shape) == 1 else y_train.shape[1]
         self.hidden_size = []
 
         # Layers
-        self.layers = [Layer(self.n_features, self.n_features, input_layer=True)]  # Init Input Layer
+        self.layers = [Layer(self.n_features, self.n_features, input_layer=True), Layer(self.n_features, self.n_outputs)]  # Init Input Output Layer
 
     def add_layer(self, layer_size: int):
+        # Remove output layer
+        del self.layers[-1]
+
         # Find input size
         input_size = self.layers[-1].layer_size
 
         # Add layer
         self.layers.append(Layer(input_size, layer_size))
         self.hidden_size.append(layer_size)
+
+        # Add new output layer
+        self.layers.append(Layer(layer_size, self.n_outputs))
 
     def train(self, *, alpha=0.1, batch_size=32, epochs=100):
         # Set hyper-parameters
