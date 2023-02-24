@@ -24,12 +24,16 @@ class Layer(object):
 
         self.neurons = [Neuron(input_size, index, input_neuron=input_layer) for index in range(layer_size)]  # list of neurons
 
-        # Generate parameters arrays
-        self.W = np.vstack((nj.w for nj in self.neurons))
-        self.B = np.vstack((nj.b for nj in self.neurons))
-
         # Misc
         self.__input_layer = input_layer
+
+    @property
+    def W(self):
+        return np.vstack((nj.w for nj in self.neurons))
+
+    @property
+    def B(self):
+        return np.vstack((nj.b for nj in self.neurons))
 
     def out(self, z: np.ndarray):
         # Compute layer output given input z
@@ -180,7 +184,7 @@ class FFNN(object):
             dCw.append(dCwl[::-1])
             dCb.append(dCbl[::-1])
 
-        # Average out over the batches
+        # Average out across batches
         dCw_avg = self.__avg_gradient_weight(dCw)
         dCb_avg = self.__avg_gradient_bias(dCb)
 
@@ -188,14 +192,11 @@ class FFNN(object):
         for l in range(len(self.layers)-1, 0, -1):
             for k in range(self.layers[l].layer_size):
                 # Bias
-                self.layers[l].B[k] -= self.alpha * dCb_avg[l][k]          # Update layer
                 self.layers[l].neurons[k].b -= self.alpha * dCb_avg[l][k]  # Update neuron
 
                 # Weight
                 for j in range(self.layers[l-1].layer_size):
-                    self.layers[l].W[k, j] -= self.alpha * dCw_avg[l][k][j]          # Update layer
                     self.layers[l].neurons[k].w[j] -= self.alpha * dCw_avg[l][k][j]  # Update neuron
-
 
     @staticmethod
     def __avg_gradient_bias(dCb):
