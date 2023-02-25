@@ -1,5 +1,8 @@
 import numpy as np
 
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+
 from deep_learning.activation_functions import relu, drelu
 
 
@@ -81,7 +84,7 @@ class FFNN(object):
         # Add new output layer
         self.layers.append(Layer(layer_size, self.n_outputs))
 
-    def train(self, *, alpha=0.1, batch_size=32, epochs=100):
+    def train(self, *, alpha=0.1, batch_size=32, epochs=10):
         # Set hyper-parameters
         self.alpha = alpha
         self.batch_size = batch_size
@@ -92,6 +95,7 @@ class FFNN(object):
 
         # Mini-batches Stochastic Gradient Descent (mSGD)
         # Train for the specified number of epochs
+        i = 0
         for epoch in range(epochs):
             # Shuffle the training data
             idx = np.random.permutation(self.x_train.shape[0])
@@ -110,15 +114,76 @@ class FFNN(object):
                 # Back propagation
                 self.__back_propagation(y_pred_batch, y_batch, zs_batch, activations_batch)
 
-                # Evaluate MSE at end of epoch
-                y_pred = self.predict(X_batch)
-                self.MSE = np.mean((1 / self.n_outputs) * np.sum((y_pred - y_batch) ** 2, axis=1))
-                self.losses.append(self.MSE)
+            # Evaluate MSE at end of epoch
+            y_pred = self.predict(X_shuffle)
+            self.MSE = np.mean((1 / self.n_outputs) * np.sum((y_pred - y_shuffle) ** 2, axis=1))
+            self.losses.append(self.MSE)
+
+            print("end", i, self.MSE)
+            i += 1
 
     def predict(self, z_in: np.ndarray):
         # Feed Forward
         _, _, pred = self.__feed_forward(z_in)
         return pred  # Network Activations
+
+    def print_network(self):
+        """
+        Print a graphical representation of a neural network given a list of layer sizes.
+        """
+        # print the input layer
+        print("Input Layer (%d)" % self.layers[0].layer_size)
+        print("       |        ")
+
+        # print the hidden layers
+        for i, layer in enumerate(self.layers[1:-1], 1):
+            print("Hidden Layer #%d (%d)" % (i, layer.layer_size))
+            print("       |        ")
+
+        # print the output layer
+        print("Output Layer (%d)" % self.layers[-1].layer_size)
+
+    def plot_mse(self):
+        """
+        Plot the MSE (Mean Squared Error) values over epochs.
+
+        Args:
+            self: Instance of the neural network class.
+
+        Returns:
+            None
+        """
+        # set the style of the plot
+        plt.style.use('ggplot')
+
+        # create a figure and axes object
+        fig, ax = plt.subplots()
+
+        # plot the MSE values with a blue line and a circle marker
+        ax.plot(self.losses, color='blue', marker='o', markersize=4)
+
+        # set the x and y axis labels with a larger font size
+        ax.set_xlabel('Epoch', fontsize=12)
+        ax.set_ylabel('MSE', fontsize=12)
+
+        # set the title with a larger font size
+        ax.set_title('MSE Evolution over Epochs', fontsize=14)
+
+        # add grid lines and set the line width of the grid
+        ax.grid(True, linewidth=0.5)
+
+        # remove the top and right spines of the plot
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        # set the x-axis ticks to integer values
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+
+        # Tight layout
+        plt.tight_layout()
+
+        # show the plot
+        plt.show()
 
     def __feed_forward(self, z_in: np.ndarray):
         if len(self.layers) < 2:
@@ -138,7 +203,7 @@ class FFNN(object):
 
             # Append
             activations_batch.append(activations)
-            pred = np.vstack([pred, activations[-1]]) if pred.any() else activations[-1]
+            pred = np.vstack([pred, activations[-1]]) if pred.size else activations[-1]
             zs_batch.append(zs)
         return zs_batch, activations_batch, pred  # Network Activations
 

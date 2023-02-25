@@ -17,8 +17,9 @@ nn = FFNN(X_train, Y_train)
 nn.add_layer(16)
 
 # Train neural network
+nn.print_network()
 nn.train()
-
+nn.plot_mse()
 
 
 
