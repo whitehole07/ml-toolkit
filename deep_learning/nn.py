@@ -10,7 +10,7 @@ class Neuron(object):
 
         # Parameters
         if not input_neuron:
-            self.w = 0.1 * np.random.rand(1, input_size)  # weights
+            self.w = 0.1 * np.random.rand(input_size)  # weights
         else:
             self.w = np.ones(input_size)  # weights
         self.b = 0                        # bias
@@ -38,10 +38,10 @@ class Layer(object):
     def out(self, z: np.ndarray):
         # Compute layer output given input z
         if not self.__input_layer:
-            z = np.dot(self.W, z) + self.B
+            z = (np.dot(self.W, z.reshape(-1, 1)) + self.B).reshape((-1, ))
             return z, relu(z)
         else:
-            return z, z
+            return z.reshape((-1, )), z.reshape((-1, ))
 
 
 class FFNN(object):
@@ -52,8 +52,8 @@ class FFNN(object):
         self.epochs = None      # Number of epochs
 
         # Train sets
-        self.x_train = x_train  # Size of (samples, features)
-        self.y_train = y_train  # Size of (samples, outputs)
+        self.x_train = x_train if x_train.ndim > 1 else x_train.reshape((-1, 1))  # Size of (samples, features)
+        self.y_train = y_train if y_train.ndim > 1 else y_train.reshape((-1, 1))  # Size of (samples, outputs)
 
         # Init Loss list
         self.losses = []
@@ -105,18 +105,9 @@ class FFNN(object):
             # Train on each mini-batch
             for X_batch, y_batch in zip(X_batches, y_batches):
                 # Forward propagation
-                y_pred_batch = np.array([])
-                activations_batch = []
-                zs_batch = []
-                for X_row, y_row in zip(X_batch, y_batch):  # Iterate over batch samples
-                    zs, activations = self.__feed_forward(X_row)  # Propagate single sample
+                zs_batch, activations_batch, y_pred_batch = self.__feed_forward(X_batch)  # Propagate single sample
 
-                    # Update batch prediction
-                    activations_batch.append(activations)
-                    zs_batch.append(zs)
-                    y_pred_batch = np.vstack((y_pred_batch, activations[-1]))
-
-                # Backpropagation
+                # Back propagation
                 self.__back_propagation(y_pred_batch, y_batch, zs_batch, activations_batch)
 
                 # Evaluate MSE at end of epoch
@@ -126,33 +117,41 @@ class FFNN(object):
 
     def predict(self, z_in: np.ndarray):
         # Feed Forward
-        _, activations = self.__feed_forward(z_in)
-        return activations[-1]  # Network Activations
+        _, _, pred = self.__feed_forward(z_in)
+        return pred  # Network Activations
 
     def __feed_forward(self, z_in: np.ndarray):
         if len(self.layers) < 2:
             raise ValueError("Output layer was not set, add hidden layer")
 
         # Feed Forward
-        a = z_in  # Init state
-        activations = []
-        zs = []
-        for layer in self.layers:
-            z, a = layer.out(a)    # Propagate state
-            zs.append(z)           # Update states
-            activations.append(a)  # Update activations
-        return zs, activations  # Network Activations
+        activations_batch = []
+        pred = np.array([])
+        zs_batch = []
+        for a in z_in:
+            activations = []
+            zs = []
+            for layer in self.layers:
+                z, a = layer.out(a)    # Propagate state
+                zs.append(z)           # Update states
+                activations.append(a)  # Update activations
+
+            # Append
+            activations_batch.append(activations)
+            pred = np.vstack([pred, activations[-1]]) if pred.any() else activations[-1]
+            zs_batch.append(zs)
+        return zs_batch, activations_batch, pred  # Network Activations
 
     def __back_propagation(self, y_pred_batch, y_batch, zs_batch, activations_batch):
         # Init gradient matrices
-        dCw = []
-        dCb = []
+        dCw = []  # first layer skipped, reason for indexing with l-1 instead of l
+        dCb = []  # first layer skipped, reason for indexing with l-1 instead of l
 
         # Iterate over batch samples
         for zs_batch_row, activations_batch_row, y_pred_batch_row, y_batch_row in zip(zs_batch, activations_batch, y_pred_batch, y_batch):
             # Init batch matrices
-            dCwl = [[] for _ in range(len(self.layers)-1)]
-            dCbl = [[[] for _ in range(self.layers[x])] for x in range(len(self.layers)-1, 0, -1)]
+            dCwl = [[[] for _ in range(len(self.layers[x].neurons))] for x in range(1, len(self.layers))]
+            dCbl = [[] for _ in range(1, len(self.layers))]
 
             # Last layer
             delta_l_next = []
@@ -164,7 +163,7 @@ class FFNN(object):
                     dCwl[-1][j].append(delta_l_next[-1] * activations_batch_row[-2][z])  # here j is in layer l and z in layer l-1
 
             # Add gradients
-            dCbl[-1].append(delta_l_next)
+            dCbl[-1] = delta_l_next
 
             # Iterate over next layers
             for l in range(len(self.layers)-2, 0, -1):  # Exclude output and input layers
@@ -173,22 +172,22 @@ class FFNN(object):
                 for j in range(self.layers[l].layer_size):
                     dl = 0
                     for k in range(self.layers[l+1].layer_size):
-                        dl += delta_l_next[k] * self.layers[l+1].W[j, k] * drelu(zs_batch_row[l][j])
+                        dl += delta_l_next[k] * self.layers[l+1].W[k, j] * drelu(zs_batch_row[l][j])
                     delta_l.append(dl)
 
                     # Compute weight gradients
                     for z in range(self.layers[l-1].layer_size):
-                        dCwl[l][j].append(delta_l[-1] * activations_batch_row[l-1][z])  # here j is in layer l and z in layer l-1
+                        dCwl[l-1][j].append(delta_l[-1] * activations_batch_row[l-1][z])  # here j is in layer l and z in layer l-1
 
                 # Add gradients
-                dCbl.append(delta_l)
+                dCbl[l-1] = delta_l
 
                 # Clear delta_l_next
                 delta_l_next = delta_l
 
             # Batch completed, update matrix
-            dCw.append(dCwl[::-1])
-            dCb.append(dCbl[::-1])
+            dCw.append(dCwl)
+            dCb.append(dCbl)
 
         # Average out across batches
         dCw_avg = self.__avg_gradient_weight(dCw)
@@ -198,27 +197,26 @@ class FFNN(object):
         for l in range(len(self.layers)-1, 0, -1):
             for k in range(self.layers[l].layer_size):
                 # Bias
-                self.layers[l].neurons[k].b -= self.alpha * dCb_avg[l][k]  # Update neuron
+                self.layers[l].neurons[k].b -= self.alpha * dCb_avg[l-1][k]  # Update neuron
 
                 # Weight
                 for j in range(self.layers[l-1].layer_size):
-                    self.layers[l].neurons[k].w[j] -= self.alpha * dCw_avg[l][k][j]  # Update neuron
+                    self.layers[l].neurons[k].w[j] -= self.alpha * dCw_avg[l-1][k][j]  # Update neuron
 
     @staticmethod
     def __avg_gradient_bias(dCb):
         n = len(dCb)
         m = len(dCb[0])
-        k = len(dCb[0][0])
 
-        avg = [[0] * k for _ in range(m)]
+        avg = [[0] * len(dCb[0][j]) for j in range(m)]
 
         for i in range(n):
             for j in range(m):
-                for l in range(k):
+                for l in range(len(dCb[0][j])):
                     avg[j][l] += dCb[i][j][l]
 
         for j in range(m):
-            for l in range(k):
+            for l in range(len(dCb[0][j])):
                 avg[j][l] /= n
 
         return avg
@@ -227,20 +225,18 @@ class FFNN(object):
     def __avg_gradient_weight(dCw):
         n = len(dCw)
         p = len(dCw[0])
-        m = len(dCw[0][0])
-        k = len(dCw[0][0][0])
 
-        avg = [[[0] * k for _ in range(m)] for _ in range(p)]
+        avg = [[[0] * len(dCw[0][j][l]) for l in range(len(dCw[0][j]))] for j in range(p)]
 
         for i in range(n):
             for j in range(p):
-                for l in range(m):
-                    for o in range(k):
+                for l in range(len(dCw[0][j])):
+                    for o in range(len(dCw[0][j][l])):
                         avg[j][l][o] += dCw[i][j][l][o]
 
         for j in range(p):
-            for l in range(m):
-                for o in range(k):
+            for l in range(len(dCw[0][j])):
+                for o in range(len(dCw[0][j][l])):
                     avg[j][l][o] /= n
 
         return avg
