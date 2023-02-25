@@ -6,6 +6,10 @@ import matplotlib.ticker as ticker
 from deep_learning.activation_functions import relu, drelu
 
 
+# Set the random seed
+np.random.seed(42)  # TODO: remove afterwards
+
+
 class Neuron(object):
     def __init__(self, input_size: int, index: int, input_neuron=False):
         # Location
@@ -84,7 +88,7 @@ class FFNN(object):
         # Add new output layer
         self.layers.append(Layer(layer_size, self.n_outputs))
 
-    def train(self, *, alpha=0.1, batch_size=32, epochs=10):
+    def train(self, *, alpha=0.001, batch_size=32, epochs=50):
         # Set hyper-parameters
         self.alpha = alpha
         self.batch_size = batch_size
@@ -116,7 +120,7 @@ class FFNN(object):
 
             # Evaluate MSE at end of epoch
             y_pred = self.predict(X_shuffle)
-            self.MSE = np.mean((1 / self.n_outputs) * np.sum((y_pred - y_shuffle) ** 2, axis=1))
+            self.MSE = np.mean((1 / self.n_outputs) * (np.sum((y_pred - y_shuffle)**2, axis=1)))
             self.losses.append(self.MSE)
 
             print("end", i, self.MSE)
@@ -221,7 +225,7 @@ class FFNN(object):
             # Last layer
             delta_l_next = []
             for j in range(self.layers[-1].layer_size):
-                delta_l_next.append((2 / self.n_outputs) * (y_batch_row[j] - y_pred_batch_row[j]) * drelu(zs_batch_row[-1][j]))
+                delta_l_next.append((2 / self.n_outputs) * -(y_batch_row[j] - y_pred_batch_row[j]) * drelu(zs_batch_row[-1][j]))
 
                 # Compute weight gradients
                 for z in range(self.layers[-2].layer_size):
