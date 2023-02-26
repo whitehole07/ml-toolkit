@@ -3,7 +3,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-from deep_learning.pre_processing import one_hot_encode
+from pre_processing.tools import one_hot_encode
 from deep_learning.nn import FFNN
 
 
