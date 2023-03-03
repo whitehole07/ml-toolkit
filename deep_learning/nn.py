@@ -349,4 +349,3 @@ class FFNN(object):
                     avg[j][l][o] /= n
 
         return avg
-
