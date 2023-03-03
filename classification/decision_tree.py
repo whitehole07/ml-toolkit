@@ -70,14 +70,21 @@ class DecisionTreeClassifier(object):
                 feature_label = None if self.feature_names is None else self.feature_names[best_split["feature_index"]]
 
                 # return decision node
-                return Node(feature_label, best_split["feature_index"], best_split["threshold"],
-                            left_subtree, right_subtree, best_split["info_gain"])
+                if (left_subtree.value is not None and right_subtree.value is not None) and \
+                        (left_subtree.value == right_subtree.value):
+                    return Node(value=left_subtree.value,
+                                value_name=None if self.class_names is None else self.class_names[
+                                    int(left_subtree.value)])
+                else:
+                    return Node(feature_label, best_split["feature_index"], best_split["threshold"],
+                                left_subtree, right_subtree, best_split["info_gain"])
 
         # Compute leaf node
         leaf_value = self.mode(Y)
 
         # Return leaf node
-        return Node(value=leaf_value, value_name=None if self.class_names is None else self.class_names[int(leaf_value)])
+        return Node(value=leaf_value,
+                    value_name=None if self.class_names is None else self.class_names[int(leaf_value)])
 
     def __get_best_split(self, dataset, num_features):
         """ Finds to find the best split """
@@ -152,7 +159,7 @@ class DecisionTreeClassifier(object):
         return 1 - gini
 
     def plot_tree(self):
-        plt.subplots(figsize=(8, 6))
+        plt.subplots(figsize=(19.2, 10.8))
         self.__gen_tree(self.root, x=0, y=0)
         plt.axis('off')
         plt.show()
@@ -171,8 +178,8 @@ class DecisionTreeClassifier(object):
         plt.text(x, y, f"{feature} <= {threshold}\nIG={node.info_gain:.3f}", ha='center', va='center',
                  bbox=dict(facecolor='white', edgecolor='black', boxstyle='round'))
 
-        x_left, y_left = self.__gen_tree(node.left, depth+1, x-2**(10-depth), y-2)
-        x_right, y_right = self.__gen_tree(node.right, depth+1, x+2**(10-depth), y-2)
+        x_left, y_left = self.__gen_tree(node.left, depth + 1, x - 2**(5-depth) - 2**(2+depth), y - 2)
+        x_right, y_right = self.__gen_tree(node.right, depth + 1, x + 2**(5-depth) + 2**(2+depth), y - 2)
 
         plt.plot([x, x_left], [y, y_left], 'b-')
         plt.plot([x, x_right], [y, y_right], 'b-')
@@ -195,7 +202,7 @@ class DecisionTreeClassifier(object):
 
     def predict(self, X):
         """ Predicts on new data """
-        return [self.__go_through_nodes(x, self.root) for x in X]
+        return np.array([self.__go_through_nodes(x, self.root) for x in X])
 
     def __go_through_nodes(self, x, tree):
         """ Predicts a single data point """
